@@ -1,23 +1,27 @@
-# Base R image
+# Base image with R
 FROM rocker/r-ver:4.5.1
 
-# Install Linux system libraries required for plumber and dependencies
+# Install system-level libraries required by plumber, httpuv, and sodium
 RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
+    libz-dev \
+    libsodium-dev \
     build-essential \
     && apt-get clean
 
-# Install R packages (plumber + dependencies)
+# Install R packages
 RUN R -e "install.packages(c('plumber', 'jsonlite', 'data.table'), repos = 'https://cran.rstudio.com')"
 
-# Create app directory and copy webhook script
+# Set working directory
 WORKDIR /app
+
+# Copy your webhook script
 COPY openfield_webhook.R /app/openfield_webhook.R
 
-# Expose the port Plumber will use
+# Expose the plumber API port
 EXPOSE 8000
 
-# Command to run your webhook
+# Run the plumber API
 CMD ["R", "-e", "plumber::plumb('openfield_webhook.R')$run(host='0.0.0.0', port=8000)"]
