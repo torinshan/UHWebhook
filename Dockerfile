@@ -1,41 +1,27 @@
-FROM rocker/r-ver:latest
+# Base image with R
+FROM rocker/r-ver:4.5.1
 
-# Install system dependencies
+# Install system-level libraries required by plumber, httpuv, and sodium
 RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libz-dev \
+    libsodium-dev \
+    build-essential \
+    && apt-get clean
 
 # Install R packages
-RUN R -e "install.packages(c('plumber', 'jsonlite', 'data.table', 'tidyverse', 'httr', 'catapultR', 'lubridate', 'openxlsx'), repos='https://cran.rstudio.com')"
+RUN R -e "install.packages(c('plumber', 'jsonlite', 'data.table'), repos = 'https://cran.rstudio.com')"
 
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy application files
-COPY enhanced_openfield_webhook.R /app/enhanced_openfield_webhook.R
-COPY process_new_activity.R /app/process_new_activity.R
-COPY run_webhook.R /app/run_webhook.R
+# Copy your webhook script
+COPY openfield_webhook.R /app/openfield_webhook.R
 
-# Create data directories
-RUN mkdir -p /app/data
-RUN mkdir -p /app/logs
-
-# Create foundational directory and add placeholder files
-RUN mkdir -p /app/Foundational_CSVs
-RUN echo "parameter_slug_1\nparameter_slug_2\nparameter_slug_3" > /app/Foundational_CSVs/slugs_activities.csv
-RUN echo "period_parameter_1\nperiod_parameter_2\nperiod_parameter_3" > /app/Foundational_CSVs/slugs_periods.csv
-
-# Expose port
+# Expose the plumber API port
 EXPOSE 8000
 
-# Set environment variables
-ENV R_CONFIG_ACTIVE=production
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
-# Run the webhook server
-CMD ["Rscript", "run_webhook.R"]
+# Run the plumber API
+CMD ["R", "-e", "plumber::plumb('openfield_webhook.R')$run(host='0.0.0.0', port=8000)"]
